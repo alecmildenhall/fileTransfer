@@ -1,0 +1,10 @@
+Description:
+- 3 clients 1 server
+- use both UDP and TCP
+- overall system offers at least 10 unique files
+
+- 2 modes of operation: client and server
+    - server instance keeps track of all the clients in network (w/ IP addresses + files they're sharing)
+    - this info is given to clients which the clients use to communicate w/ each other and transfer files
+
+- UDP for for server-client communication + TCP for client-client communication
