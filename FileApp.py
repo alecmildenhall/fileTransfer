@@ -24,14 +24,14 @@ except:
 if (mode == "-s"):
     # server mode
     try:
-        port = sys.argv[2]
+        port = int(sys.argv[2])
     except:
         print('use: FileApp -s <port>')
         sys.exit()
 
     serverSocket = socket(AF_INET, SOCK_DGRAM)
     serverSocket.bind(('', port))
-    serverSocket.listen(3) # Accepts 3 sequential connections
+    #serverSocket.listen(3) # Accepts 3 sequential connections
 
     table = []
     # names, online-status, IPaddresses, TCP and UDP port numbers, and filenames
