@@ -12,6 +12,7 @@ import sys
 #   - server needs to be started before the clients can start coming online
 
 # server has to maintain a table (nick-names of clients + files they are sharing + their IP addresses + port numbers)
+server_started = False
 
 try:
     mode = sys.argv[1]
@@ -22,12 +23,49 @@ except:
 
 if (mode == "-s"):
     # server mode
+    try:
+        port = sys.argv[2]
+    except:
+        print('use: FileApp -s <port>')
+        sys.exit()
+
+    serverSocket = socket(AF_INET, SOCK_DGRAM)
+    serverSocket.bind(('', port))
+    serverSocket.listen(3) # Accepts 3 sequential connections
+
     table = []
     # names, online-status, IPaddresses, TCP and UDP port numbers, and filenames
 
-    # recieves registration request
+    server_started = True
+
+    # receives registration request
+    message, clientAddress = serverSocket.recvfrom(2048)
+
+    try:
+        client_info = message.split()
+        client_name = client_info[0]
+        client_udp = client_info[1]
+        client_tcp = client_info[2]
+        client_status = client_info[3]
+    except:
+        print('invalid registration request')
+        sys.exit() # TODO: this is prob not the right thing to do
+    
+    # check if name already exists
+    for client in table:
+        if client[0] == client_name:
+            print(client_name + ' is already registered')
+            # TODO: send error message and reject registration
+
+    # add client info to table
+    table.append([client_name, client_status, clientAddress, client_tcp, client_udp, []])
+
+
 elif (mode == "-c"):
     # client mode
+    if (not server_started):
+        print('server must be started first')
+        sys.exit()
 
     # get command line arguments
     try:
@@ -57,7 +95,9 @@ elif (mode == "-c"):
     clientSocket = socket(AF_INET, SOCK_DGRAM)
 
     # send registration request
-
+    status = 'on'
+    message = name + ' ' + client_udp_port + ' ' + client_tcp_port + ' ' + status
+    clientSocket.sendto(message,(server_ip, server_port))
 
     # sucessful client registration?
     # TODO: do i need prompt first? what makes this successful
