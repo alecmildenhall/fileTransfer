@@ -4,6 +4,8 @@ from socket import *
 import sys
 
 ## Helper Functions ##
+
+# TODO: something is going wrong here bc the last thing is [] rn, just make it a string for now buddy
 def stringToTable(string):
     table = []
     string_tables = string.split("/")
