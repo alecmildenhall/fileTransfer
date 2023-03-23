@@ -107,7 +107,7 @@ if (mode == "-s"):
         # check for ACK
         message, clientAddress = serverSocket.recvfrom(2048)
         message = message.decode()
-        if (message == "ack"):
+        if (message == "ACK"):
             print('ACK received')
 
 
@@ -142,6 +142,8 @@ elif (mode == "-c"):
         print('given port(s) out of range')
         sys.exit()
 
+    print('>>> ', end='', flush=True)
+
     # initiate client communication to server
     clientSocket = socket(AF_INET, SOCK_DGRAM)
 
@@ -152,16 +154,21 @@ elif (mode == "-c"):
 
     # receive registration confirmation
     while True:
-        serverMessage, serverAddress = clientSocket.recvfrom(2048)
-        serverMessage = serverMessage.decode()
-        if (serverMessage == "registered"):
-            break
+        try:
+            serverMessage, serverAddress = clientSocket.recvfrom(2048)
+            serverMessage = serverMessage.decode()
+            if (serverMessage == "registered"):
+                break
+        except:
+            print('registration error')
     
-    print('>>> [Welcome, You are registered.]')
+    print('[Welcome, You are registered.]')
+    print('>>> ', end='', flush=True)
 
     # receive updated table
     updated_table_string, serverAddress = clientSocket.recvfrom(2048)
 
+    # once the table is received, client sends ack to server
     # send ACK
     ack = "ACK"
     clientSocket.sendto(ack.encode(),(server_ip, server_port))
@@ -169,7 +176,11 @@ elif (mode == "-c"):
     # update table
     updated_table_string = updated_table_string.decode()
     updated_table = stringToTable(updated_table_string)
-    print('>>> [Client table updated.]')
+    print('[Client table updated.]')
+    print('>>> ', end='', flush=True)
+
+    while True:
+        pass
 
     
     # name of offered files, client name, IP, TCP port number
