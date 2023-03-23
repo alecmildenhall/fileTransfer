@@ -117,9 +117,9 @@ elif (mode == "-c"):
     try:
         name = sys.argv[2]
         server_ip = sys.argv[3]
-        server_port = sys.argv[4]
-        client_udp_port = sys.argv[5]
-        client_tcp_port = sys.argv[6]
+        server_port = int(sys.argv[4])
+        client_udp_port = int(sys.argv[5])
+        client_tcp_port = int(sys.argv[6])
     except:
         print('use: FileApp -c <name> <server-ip> <server-port> <client-udp-port> <client-tcp-port>')
         sys.exit()
@@ -142,7 +142,7 @@ elif (mode == "-c"):
 
     # send registration request
     status = 'on'
-    message = name + ' ' + client_udp_port + ' ' + client_tcp_port + ' ' + status
+    message = name + ' ' + str(client_udp_port) + ' ' + str(client_tcp_port) + ' ' + status
     clientSocket.sendto(message.encode(),(server_ip, server_port))
 
     # receive registration confirmation
