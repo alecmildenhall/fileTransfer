@@ -3,6 +3,33 @@
 from socket import *
 import sys
 
+## Helper Functions ##
+def stringToTable(string):
+    table = []
+    string_tables = string.split("/")
+    for string_table in string_tables:
+        items = string_table.split()
+        curr_table = []
+        for item in items:
+            curr_table.append(item)
+        table.append(curr_table)
+    
+    return table
+
+
+def tableToString(table):
+    columns = len(table)
+    rows = len(table[0])
+    output_string = ""
+
+    for i in range(columns):
+        for j in range(rows):
+            output_string = table[i][j] + " "
+        output_string = output_string + "/"
+    
+    output_string = output_string.strip(" /")
+    return output_string
+
 ## Registration ##
 
 # only registered clients should be able to offer files
@@ -69,7 +96,18 @@ if (mode == "-s"):
         serverSocket.sendto(message.encode(), clientAddress)
 
         # send client updated table
-        
+        table_string = tableToString(table)
+        serverSocket.sendto(table_string.encode(), clientAddress)
+
+        # check for ACK
+        message, clientAddress = serverSocket.recvfrom(2048)
+        message = message.decode()
+        if (message == "ack"):
+            print('ACK received')
+
+
+        # if don't receive ACK after 500 ms
+        # send table again (try this twice)
 
 
 elif (mode == "-c"):
@@ -116,15 +154,24 @@ elif (mode == "-c"):
     
     print('>>> [Welcome, You are registered.]')
 
-    local_table = []
+    # receive updated table
+    updated_table_string, serverAddress = clientSocket.recvfrom(2048)
+
+    # send ACK
+    ack = "ACK"
+    clientSocket.sendto(ack.encode(),(server_ip, server_port))
+
+    # update table
+    updated_table_string = updated_table_string.decode()
+    updated_table = stringToTable(updated_table_string)
+    print('>>> [Client table updated.]')
+
+    
     # name of offered files, client name, IP, TCP port number
     # update (overwrite) its local table when the server sends information 
     # about all the other clients. Once the table is received, the client 
     # should send an ack to the server.
 
-    updated = False
-    if (updated):
-        print('>>> [Client table updated.]')
 
 else:
     print('use: FileApp -s <port> or \
