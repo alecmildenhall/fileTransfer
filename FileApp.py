@@ -26,7 +26,8 @@ def tableToString(table):
 
     for i in range(columns):
         for j in range(rows):
-            output_string = table[i][j] + " "
+            print("table[i][j] = " + str(table[i][j]))
+            output_string = str(table[i][j]) + " "
         output_string = output_string + "/"
     
     output_string = output_string.strip(" /")
@@ -67,6 +68,7 @@ if (mode == "-s"):
     # receives registration request
     while True:
         message, clientAddress = serverSocket.recvfrom(2048)
+        clientIP = clientAddress[0]
         message = message.decode()
 
         try:
@@ -91,7 +93,8 @@ if (mode == "-s"):
             continue
 
         # add client info to table
-        table.append([client_name, client_status, clientAddress, client_tcp, client_udp, []])
+        # TODO: change files --> some list of lists or sm
+        table.append([client_name, client_status, clientIP, client_tcp, client_udp, "files"])
 
         # send client registered message
         message = "registered"
