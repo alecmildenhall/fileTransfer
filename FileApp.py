@@ -116,6 +116,16 @@ if (mode == "-s"):
         # TODO: if don't receive ACK after 500 ms
         # send table again (try this twice)
 
+        # receive updated files
+        message, clientAddress = serverSocket.recvfrom(2048)
+        message = message.decode()
+        if ('offer' in message):
+            items = message.split()
+            name = items[1]
+            files = items[2:]
+            # TODO: match name & add files
+            pass
+
 
 elif (mode == "-c"):
     # client mode
@@ -208,6 +218,18 @@ elif (mode == "-c"):
             if (not setup):
                 print('must set a directory first')
                 continue
+            inputs = command.split()
+            if (len(inputs) < 2):
+                print('use: offer <filename1> ...')
+                continue
+            files = inputs[1:]
+
+            # send server UDP message with updated files
+            message = 'offer ' + name + ' '
+            for file in files:
+                message = file + ' '
+            message = message.strip()
+            clientSocket.sendto(message.encode(),(server_ip, server_port))
 
 
 else:
