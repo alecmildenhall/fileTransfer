@@ -15,11 +15,20 @@ def stringToTable(string):
         curr_table = []
         for item in items:
             curr_table.append(item)
+            # files list section
+            if (item == 5):
+                files = []
+                string_files = items[5].split("*")
+                for string_file in string_files:
+                    files.append(string_file)
+            curr_table[5].append(files)
+
         table.append(curr_table)
     
     return table
 
 
+# TODO: edit this so last item (5th) is a list
 def tableToString(table):
     columns = len(table)
     rows = len(table[0])
@@ -29,10 +38,25 @@ def tableToString(table):
         for j in range(rows):
             print("table[i][j] = " + str(table[i][j]))
             output_string = str(table[i][j]) + " "
+            # list of files section
+            if (j == 5):
+                for k in range(len(table[i][j])):
+                    output_string = str(table[i][j][k]) + "*"
+                output_string = output_string.strip("*")
         output_string = output_string + "/"
     
     output_string = output_string.strip(" /")
     return output_string
+
+# TODO: match name & add files
+# table: [client_name, client_status, clientIP, client_tcp, client_udp, "files"]
+def updateFiles(name, files, table):
+    for client in table:
+        if (table[client][0] == name):
+            for file in files:
+                if (file not in table[client][5]):
+                    table[client][5].append(file)
+            break
 
 ## Registration ##
 
@@ -95,7 +119,7 @@ if (mode == "-s"):
 
         # add client info to table
         # TODO: change files --> some list of lists or sm
-        table.append([client_name, client_status, clientIP, client_tcp, client_udp, "files"])
+        table.append([client_name, client_status, clientIP, client_tcp, client_udp, []])
 
         # send client registered message
         message = "registered"
@@ -124,7 +148,7 @@ if (mode == "-s"):
             name = items[1]
             files = items[2:]
             # TODO: match name & add files
-            pass
+            updateFiles(name, files, table)
 
 
 elif (mode == "-c"):
