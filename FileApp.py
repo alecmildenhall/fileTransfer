@@ -2,6 +2,7 @@
 
 from socket import *
 import sys
+import os
 
 ## Helper Functions ##
 
@@ -178,10 +179,35 @@ elif (mode == "-c"):
     updated_table_string = updated_table_string.decode()
     updated_table = stringToTable(updated_table_string)
     print('[Client table updated.]')
-    print('>>> ', end='', flush=True)
 
+    setup = False
     while True:
-        pass
+        command = input('>>> ')
+
+        # setdir functionality
+        if ("setdir" in command):
+            inputs = command.split()
+            if (len(inputs) != 2):
+                print('use: setdir <dir>')
+                continue
+    
+            dir = inputs[1]
+
+            # search for directory
+            path = os.getcwd()
+            print('path: ' + path)
+            if (not os.path.isdir(path)):
+                print('[setdir failed: <dir> does not exist.]')
+                continue
+            
+            print('[Successfully set <dir> as the directory for searching offered files.]')
+            setup = True
+
+        # TODO: offer functionality
+        elif ("offer" in command):
+            if (not setup):
+                print('must set a directory first')
+                continue
 
 
 else:
