@@ -105,13 +105,14 @@ if (mode == "-s"):
         serverSocket.sendto(table_string.encode(), clientAddress)
 
         # check for ACK
+        retry = 0
         message, clientAddress = serverSocket.recvfrom(2048)
         message = message.decode()
         if (message == "ACK"):
             print('ACK received')
 
 
-        # if don't receive ACK after 500 ms
+        # TODO: if don't receive ACK after 500 ms
         # send table again (try this twice)
 
 
@@ -181,12 +182,6 @@ elif (mode == "-c"):
 
     while True:
         pass
-
-    
-    # name of offered files, client name, IP, TCP port number
-    # update (overwrite) its local table when the server sends information 
-    # about all the other clients. Once the table is received, the client 
-    # should send an ack to the server.
 
 
 else:
