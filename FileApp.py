@@ -35,17 +35,26 @@ def tableToString(table):
     output_string = ""
 
     for i in range(columns):
+        row_string = ""
         for j in range(rows):
-            print("table[i][j] = " + str(table[i][j]))
-            output_string = str(table[i][j]) + " "
+            if (j != 5):
+                row_string = str(table[i][j]) + " "
             # list of files section
-            if (j == 5):
+            else:
+                files_string = ""
+                flag = 0
                 for k in range(len(table[i][j])):
-                    output_string = str(table[i][j][k]) + "*"
-                output_string = output_string.strip("*")
+                    files_string = str(table[i][j][k]) + "*"
+                    flag = 1
+                if (not flag):
+                    files_string = "none"
+                files_string = files_string.strip("*")
+                row_string = row_string + files_string
+            output_string = output_string + row_string
         output_string = output_string + "/"
     
     output_string = output_string.strip(" /")
+    print("output_string: " + output_string)
     return output_string
 
 # TODO: match name & add files
@@ -127,6 +136,7 @@ if (mode == "-s"):
 
         # send client updated table
         table_string = tableToString(table)
+        print("server table: " + table_string)
         serverSocket.sendto(table_string.encode(), clientAddress)
 
         # check for ACK
@@ -186,6 +196,7 @@ elif (mode == "-c"):
     # send registration request
     status = 'on'
     message = name + ' ' + str(client_udp_port) + ' ' + str(client_tcp_port) + ' ' + status
+    print("reg req: " + message)
     clientSocket.sendto(message.encode(),(server_ip, server_port))
 
     # receive registration confirmation
@@ -211,6 +222,7 @@ elif (mode == "-c"):
 
     # update table
     updated_table_string = updated_table_string.decode()
+    print("updated string: " + updated_table_string)
     updated_table = stringToTable(updated_table_string)
     print('[Client table updated.]')
 
