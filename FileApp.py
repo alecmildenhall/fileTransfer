@@ -13,22 +13,26 @@ def stringToTable(string):
     for string_table in string_tables:
         items = string_table.split()
         curr_table = []
+        i = 0
         for item in items:
             curr_table.append(item)
             # files list section
-            if (item == 5):
+            if (i == 5):
                 files = []
                 string_files = items[5].split("*")
                 for string_file in string_files:
                     files.append(string_file)
-            curr_table[5].append(files)
+                if (curr_table[5] == 'none'):
+                    curr_table[5] = []
+                else:
+                    curr_table[5].append(files)
+            i = i + 1
 
         table.append(curr_table)
     
     return table
 
 
-# TODO: edit this so last item (5th) is a list
 def tableToString(table):
     columns = len(table)
     rows = len(table[0])
@@ -37,10 +41,11 @@ def tableToString(table):
     for i in range(columns):
         row_string = ""
         for j in range(rows):
-            if (j != 5):
+            if (j < 5):
                 row_string = str(table[i][j]) + " "
             # list of files section
             else:
+                row_string = ""
                 files_string = ""
                 flag = 0
                 for k in range(len(table[i][j])):
@@ -224,6 +229,7 @@ elif (mode == "-c"):
     updated_table_string = updated_table_string.decode()
     print("updated string: " + updated_table_string)
     updated_table = stringToTable(updated_table_string)
+    print("updated_table: " + str(updated_table))
     print('[Client table updated.]')
 
     setup = False
