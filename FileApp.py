@@ -6,7 +6,6 @@ import os
 
 ## Helper Functions ##
 
-# TODO: something is going wrong here bc the last thing is [] rn, just make it a string for now buddy
 def stringToTable(string):
     table = []
     string_tables = string.split("/")
@@ -104,64 +103,74 @@ if (mode == "-s"):
     table = []
     # names, online-status, IPaddresses, TCP and UDP port numbers, and filenames
 
-    # receives registration request
+    # receives request
     while True:
         message, clientAddress = serverSocket.recvfrom(2048)
         clientIP = clientAddress[0]
         message = message.decode()
+        print("received message: " + message)
 
-        try:
-            client_info = message.split()
-            client_name = client_info[0]
-            client_udp = client_info[1]
-            client_tcp = client_info[2]
-            client_status = client_info[3]
-        except:
-            print('invalid registration request')
-            continue
-        
-        # check if name already exists
-        name_exists = 0
-        for client in table:
-            if client[0] == client_name:
-                print(client_name + ' is already registered')
-                name_exists = 1
-                break
-        
-        if (name_exists):
-            continue
+        # registration request detected
+        if ("reg: " in message):
+            message = message[5:]
+            print("cleaned message: " + message)
 
-        # add client info to table
-        # TODO: change files --> some list of lists or sm
-        table.append([client_name, client_status, clientIP, client_tcp, client_udp, []])
+            try:
+                client_info = message.split()
+                client_name = client_info[0]
+                client_udp = client_info[1]
+                client_tcp = client_info[2]
+                client_status = client_info[3]
+            except:
+                print('invalid registration request')
+                continue
+            
+            # check if name already exists
+            name_exists = 0
+            print("table: " + str(table))
+            for client in table:
+                if client[0] == client_name:
+                    print(client_name + ' is already registered')
+                    name_exists = 1
+                    break
+            
+            if (name_exists):
+                message = "error"
+                serverSocket.sendto(message.encode(), clientAddress)
+                continue
 
-        # send client registered message
-        message = "registered"
-        serverSocket.sendto(message.encode(), clientAddress)
+            # add client info to table
+            table.append([client_name, client_status, clientIP, client_tcp, client_udp, []])
+            print("updated table: " + str(table))
 
-        # send client updated table
-        table_string = tableToString(table)
-        print("server table: " + table_string)
-        serverSocket.sendto(table_string.encode(), clientAddress)
+            # send client registered message
+            message = "registered"
+            serverSocket.sendto(message.encode(), clientAddress)
 
-        # check for ACK
-        retry = 0
-        message, clientAddress = serverSocket.recvfrom(2048)
-        message = message.decode()
-        if (message == "ACK"):
-            print('ACK received')
+            # send client updated table
+            table_string = tableToString(table)
+            print("server table: " + table_string)
+            serverSocket.sendto(table_string.encode(), clientAddress)
+
+            # check for ACK
+            retry = 0
+            message, clientAddress = serverSocket.recvfrom(2048)
+            message = message.decode()
+            if (message == "ACK"):
+                print('ACK received')
 
 
-        # TODO: if don't receive ACK after 500 ms
-        # send table again (try this twice)
+            # TODO: if don't receive ACK after 500 ms
+            # send table again (try this twice)
 
         # receive updated files
-        message, clientAddress = serverSocket.recvfrom(2048)
-        message = message.decode()
-        if ('offer' in message):
+        elif ('offer' in message):
             items = message.split()
             name = items[1]
             files = items[2:]
+            print("name: " + str(name))
+            print("files: " + str(files))
+            print("table: " + str(table))
             # TODO: match name & add files
             updateFiles(name, files, table)
 
@@ -200,19 +209,17 @@ elif (mode == "-c"):
 
     # send registration request
     status = 'on'
-    message = name + ' ' + str(client_udp_port) + ' ' + str(client_tcp_port) + ' ' + status
+    message = 'reg: ' + name + ' ' + str(client_udp_port) + ' ' + str(client_tcp_port) + ' ' + status
     print("reg req: " + message)
     clientSocket.sendto(message.encode(),(server_ip, server_port))
 
     # receive registration confirmation
-    while True:
-        try:
-            serverMessage, serverAddress = clientSocket.recvfrom(2048)
-            serverMessage = serverMessage.decode()
-            if (serverMessage == "registered"):
-                break
-        except:
-            print('registration error')
+    serverMessage, serverAddress = clientSocket.recvfrom(2048)
+    serverMessage = serverMessage.decode()
+    print("serverMessage: " + serverMessage)
+    if (serverMessage != "registered"):
+        print('Error: client is already registered')
+        sys.exit()
     
     print('[Welcome, You are registered.]')
     print('>>> ', end='', flush=True)
