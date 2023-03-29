@@ -62,25 +62,18 @@ def tableToString(table):
     return output_string
 
 # TODO: match name & add files
-# table: [client_name, client_status, clientIP, client_tcp, client_udp, "files"]
+# table: [[client_name, client_status, clientIP, client_tcp, client_udp, [file1, file2, etc]], ...]
 def updateFiles(name, files, table):
     for client in table:
-        if (table[client][0] == name):
+        if (client[0] == name):
             for file in files:
-                if (file not in table[client][5]):
-                    table[client][5].append(file)
+                if (file not in client[5]):
+                    client[5].append(file)
             break
 
-## Registration ##
+## Start Main Code ##
 
-# only registered clients should be able to offer files
-#   and receive the updated list of files shared by other registered clients
-# not all clients need to register files
-# server takes in registration requests from clients using the UDP protocol
-#   - server needs to be started before the clients can start coming online
-
-# server has to maintain a table (nick-names of clients + files they are sharing + their IP addresses + port numbers)
-#server_started = False
+## Determine Mode ##
 
 try:
     mode = sys.argv[1]
@@ -90,7 +83,7 @@ except:
     sys.exit()
 
 if (mode == "-s"):
-    # server mode
+    ## Server Mode ##
     try:
         port = int(sys.argv[2])
     except:
@@ -165,6 +158,10 @@ if (mode == "-s"):
 
         # receive updated files
         elif ('offer' in message):
+            # send ACK to client
+            ack = "ACK"
+            serverSocket.sendto(ack.encode(), clientAddress)
+
             items = message.split()
             name = items[1]
             files = items[2:]
@@ -173,8 +170,13 @@ if (mode == "-s"):
             print("table: " + str(table))
             # TODO: match name & add files
             updateFiles(name, files, table)
+            print('updated files')
+            print('new table: ' + str(table))
 
-
+            # TODO:  broadcast to all active clients the most updated list of file offerings
+            # TODO: make file offerings table like specs
+            # - make function for this
+            
 elif (mode == "-c"):
     # client mode
 
@@ -253,19 +255,19 @@ elif (mode == "-c"):
             dir = inputs[1]
 
             # search for directory
-            path = os.getcwd()
+            path = os.getcwd() + '/' + dir
             print('path: ' + path)
             if (not os.path.isdir(path)):
-                print('[setdir failed: <dir> does not exist.]')
+                print('[setdir failed: ' + dir + ' does not exist.]')
                 continue
             
-            print('[Successfully set <dir> as the directory for searching offered files.]')
+            print('[Successfully set ' + dir + ' as the directory for searching offered files.]')
             setup = True
 
         # TODO: offer functionality
         elif ("offer" in command):
             if (not setup):
-                print('must set a directory first')
+                print('Error: must set a directory first')
                 continue
             inputs = command.split()
             if (len(inputs) < 2):
@@ -275,10 +277,26 @@ elif (mode == "-c"):
 
             # send server UDP message with updated files
             message = 'offer ' + name + ' '
+            file_string = ''
             for file in files:
-                message = file + ' '
+                file_string = file_string + ' ' + file
+            message = message + file_string
             message = message.strip()
             clientSocket.sendto(message.encode(),(server_ip, server_port))
+
+            # TODO: wait for ACK from server
+            serverMessage, serverAddress = clientSocket.recvfrom(2048)
+            serverMessage = serverMessage.decode()
+            if (serverMessage == "ACK"):
+                print('[Offer Message received by Server.]')
+            else:
+                # TODO: change
+                print('[No ACK from Server, please try again later.]')
+            # timeout at 500ms
+            # retry 2x
+        else:
+            print("Error: unsupported command")
+            continue
 
 
 else:
