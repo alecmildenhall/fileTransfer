@@ -3,6 +3,9 @@
 from socket import *
 import sys
 import os
+import logging
+import threading
+import time
 
 ## Helper Functions ##
 
@@ -61,7 +64,6 @@ def tableToString(table):
     print("output_string: " + output_string)
     return output_string
 
-# TODO: match name & add files
 # table: [[client_name, client_status, clientIP, client_tcp, client_udp, [file1, file2, etc]], ...]
 def updateFiles(name, files, table):
     for client in table:
@@ -71,235 +73,253 @@ def updateFiles(name, files, table):
                     client[5].append(file)
             break
 
+# b_table: [Filename, Owner, Client IP address, Port]
+def tableToBroadcastTable(table):
+    b_table = []
+    for client in table:
+        owner = client[0]
+        client_ip = client[2]
+        port = client[3]
+        for file in client[5]:
+            curr_list = [file, owner, client_ip, port]
+            b_table.append(curr_list)
+    return b_table
+
+
 ## Start Main Code ##
 
 ## Determine Mode ##
+if __name__ == "__main__":
 
-try:
-    mode = sys.argv[1]
-except:
-    print('use: FileApp -s <port> or \
-          use: FileApp -c <name> <server-ip> <server-port> <client-udp-port> <client-tcp-port>')
-    sys.exit()
-
-if (mode == "-s"):
-    ## Server Mode ##
     try:
-        port = int(sys.argv[2])
+        mode = sys.argv[1]
     except:
-        print('use: FileApp -s <port>')
+        print('use: FileApp -s <port> or \
+            use: FileApp -c <name> <server-ip> <server-port> <client-udp-port> <client-tcp-port>')
         sys.exit()
 
-    serverSocket = socket(AF_INET, SOCK_DGRAM)
-    serverSocket.bind(('', port))
-
-    table = []
-    # names, online-status, IPaddresses, TCP and UDP port numbers, and filenames
-
-    # receives request
-    while True:
-        message, clientAddress = serverSocket.recvfrom(2048)
-        clientIP = clientAddress[0]
-        message = message.decode()
-        print("received message: " + message)
-
-        # registration request detected
-        if ("reg: " in message):
-            message = message[5:]
-            print("cleaned message: " + message)
-
-            try:
-                client_info = message.split()
-                client_name = client_info[0]
-                client_udp = client_info[1]
-                client_tcp = client_info[2]
-                client_status = client_info[3]
-            except:
-                print('invalid registration request')
-                continue
-            
-            # check if name already exists
-            name_exists = 0
-            print("table: " + str(table))
-            for client in table:
-                if client[0] == client_name:
-                    print(client_name + ' is already registered')
-                    name_exists = 1
-                    break
-            
-            if (name_exists):
-                message = "error"
-                serverSocket.sendto(message.encode(), clientAddress)
-                continue
-
-            # add client info to table
-            table.append([client_name, client_status, clientIP, client_tcp, client_udp, []])
-            print("updated table: " + str(table))
-
-            # send client registered message
-            message = "registered"
-            serverSocket.sendto(message.encode(), clientAddress)
-
-            # send client updated table
-            table_string = tableToString(table)
-            print("server table: " + table_string)
-            serverSocket.sendto(table_string.encode(), clientAddress)
-
-            # check for ACK
-            retry = 0
-            message, clientAddress = serverSocket.recvfrom(2048)
-            message = message.decode()
-            if (message == "ACK"):
-                print('ACK received')
-
-
-            # TODO: if don't receive ACK after 500 ms
-            # send table again (try this twice)
-
-        # receive updated files
-        elif ('offer' in message):
-            # send ACK to client
-            ack = "ACK"
-            serverSocket.sendto(ack.encode(), clientAddress)
-
-            items = message.split()
-            name = items[1]
-            files = items[2:]
-            print("name: " + str(name))
-            print("files: " + str(files))
-            print("table: " + str(table))
-            # TODO: match name & add files
-            updateFiles(name, files, table)
-            print('updated files')
-            print('new table: ' + str(table))
-
-            # TODO:  broadcast to all active clients the most updated list of file offerings
-            # TODO: make file offerings table like specs
-            # - make function for this
-            
-elif (mode == "-c"):
-    # client mode
-
-    # get command line arguments
-    try:
-        name = sys.argv[2]
-        server_ip = sys.argv[3]
-        server_port = int(sys.argv[4])
-        client_udp_port = int(sys.argv[5])
-        client_tcp_port = int(sys.argv[6])
-    except:
-        print('use: FileApp -c <name> <server-ip> <server-port> <client-udp-port> <client-tcp-port>')
-        sys.exit()
-
-    # check arguments
-    for c in server_ip:
-        if (c != '.' and not str(c).isdigit()):
-            print('invalid IP address')
+    if (mode == "-s"):
+        ## Server Mode ##
+        try:
+            port = int(sys.argv[2])
+        except:
+            print('use: FileApp -s <port>')
             sys.exit()
-    
-    
-    if ((int(server_port) < 1024 or int(server_port) > 65535) or 
-        (int(client_udp_port) < 1024 or int(client_udp_port) > 65535) or
-        (int(client_tcp_port) < 1024 or int(client_tcp_port) > 65535)):
-        print('given port(s) out of range')
-        sys.exit()
 
-    print('>>> ', end='', flush=True)
+        serverSocket = socket(AF_INET, SOCK_DGRAM)
+        serverSocket.bind(('', port))
 
-    # initiate client communication to server
-    clientSocket = socket(AF_INET, SOCK_DGRAM)
+        table = []
+        # names, online-status, IPaddresses, TCP and UDP port numbers, and filenames
 
-    # send registration request
-    status = 'on'
-    message = 'reg: ' + name + ' ' + str(client_udp_port) + ' ' + str(client_tcp_port) + ' ' + status
-    print("reg req: " + message)
-    clientSocket.sendto(message.encode(),(server_ip, server_port))
+        # receives request
+        while True:
+            message, clientAddress = serverSocket.recvfrom(2048)
+            clientIP = clientAddress[0]
+            message = message.decode()
+            print("received message: " + message)
 
-    # receive registration confirmation
-    serverMessage, serverAddress = clientSocket.recvfrom(2048)
-    serverMessage = serverMessage.decode()
-    print("serverMessage: " + serverMessage)
-    if (serverMessage != "registered"):
-        print('Error: client is already registered')
-        sys.exit()
-    
-    print('[Welcome, You are registered.]')
-    print('>>> ', end='', flush=True)
+            # registration request detected
+            if ("reg: " in message):
+                message = message[5:]
+                print("cleaned message: " + message)
 
-    # receive updated table
-    updated_table_string, serverAddress = clientSocket.recvfrom(2048)
+                try:
+                    client_info = message.split()
+                    client_name = client_info[0]
+                    client_udp = client_info[1]
+                    client_tcp = client_info[2]
+                    client_status = client_info[3]
+                except:
+                    print('invalid registration request')
+                    continue
+                
+                # check if name already exists
+                name_exists = 0
+                print("table: " + str(table))
+                for client in table:
+                    if client[0] == client_name:
+                        print(client_name + ' is already registered')
+                        name_exists = 1
+                        break
+                
+                if (name_exists):
+                    message = "error"
+                    serverSocket.sendto(message.encode(), clientAddress)
+                    continue
 
-    # once the table is received, client sends ack to server
-    # send ACK
-    ack = "ACK"
-    clientSocket.sendto(ack.encode(),(server_ip, server_port))
+                # add client info to table
+                table.append([client_name, client_status, clientIP, client_tcp, client_udp, []])
+                print("updated table: " + str(table))
 
-    # update table
-    updated_table_string = updated_table_string.decode()
-    print("updated string: " + updated_table_string)
-    updated_table = stringToTable(updated_table_string)
-    print("updated_table: " + str(updated_table))
-    print('[Client table updated.]')
+                # send client registered message
+                message = "registered"
+                serverSocket.sendto(message.encode(), clientAddress)
 
-    setup = False
-    while True:
-        command = input('>>> ')
+                # send client updated table
+                table_string = tableToString(table)
+                print("server table: " + table_string)
+                serverSocket.sendto(table_string.encode(), clientAddress)
 
-        # setdir functionality
-        if ("setdir" in command):
-            inputs = command.split()
-            if (len(inputs) != 2):
-                print('use: setdir <dir>')
-                continue
-    
-            dir = inputs[1]
+                # check for ACK
+                retry = 0
+                message, clientAddress = serverSocket.recvfrom(2048)
+                message = message.decode()
+                if (message == "ACK"):
+                    print('ACK received')
 
-            # search for directory
-            path = os.getcwd() + '/' + dir
-            print('path: ' + path)
-            if (not os.path.isdir(path)):
-                print('[setdir failed: ' + dir + ' does not exist.]')
-                continue
-            
-            print('[Successfully set ' + dir + ' as the directory for searching offered files.]')
-            setup = True
 
-        # TODO: offer functionality
-        elif ("offer" in command):
-            if (not setup):
-                print('Error: must set a directory first')
-                continue
-            inputs = command.split()
-            if (len(inputs) < 2):
-                print('use: offer <filename1> ...')
-                continue
-            files = inputs[1:]
+                # TODO: if don't receive ACK after 500 ms
+                # send table again (try this twice)
 
-            # send server UDP message with updated files
-            message = 'offer ' + name + ' '
-            file_string = ''
-            for file in files:
-                file_string = file_string + ' ' + file
-            message = message + file_string
-            message = message.strip()
-            clientSocket.sendto(message.encode(),(server_ip, server_port))
+                # TODO: broadcast to clients?
+                broadcast_table = tableToBroadcastTable(table)
 
-            # TODO: wait for ACK from server
-            serverMessage, serverAddress = clientSocket.recvfrom(2048)
-            serverMessage = serverMessage.decode()
-            if (serverMessage == "ACK"):
-                print('[Offer Message received by Server.]')
+            # receive updated files
+            elif ('offer' in message):
+                # send ACK to client
+                ack = "ACK"
+                serverSocket.sendto(ack.encode(), clientAddress)
+
+                items = message.split()
+                name = items[1]
+                files = items[2:]
+                print("name: " + str(name))
+                print("files: " + str(files))
+                print("table: " + str(table))
+                # TODO: match name & add files
+                updateFiles(name, files, table)
+                print('updated files')
+                print('new table: ' + str(table))
+
+                # TODO: broadcast to all active clients the most updated list of file offerings
+                # - needs threads to accomplish this
+                broadcast_table = tableToBroadcastTable(table)
+                print('broadcast table: ' + str(broadcast_table))
+                
+    elif (mode == "-c"):
+        # client mode
+
+        # get command line arguments
+        try:
+            name = sys.argv[2]
+            server_ip = sys.argv[3]
+            server_port = int(sys.argv[4])
+            client_udp_port = int(sys.argv[5])
+            client_tcp_port = int(sys.argv[6])
+        except:
+            print('use: FileApp -c <name> <server-ip> <server-port> <client-udp-port> <client-tcp-port>')
+            sys.exit()
+
+        # check arguments
+        for c in server_ip:
+            if (c != '.' and not str(c).isdigit()):
+                print('invalid IP address')
+                sys.exit()
+        
+        
+        if ((int(server_port) < 1024 or int(server_port) > 65535) or 
+            (int(client_udp_port) < 1024 or int(client_udp_port) > 65535) or
+            (int(client_tcp_port) < 1024 or int(client_tcp_port) > 65535)):
+            print('given port(s) out of range')
+            sys.exit()
+
+        print('>>> ', end='', flush=True)
+
+        # initiate client communication to server
+        clientSocket = socket(AF_INET, SOCK_DGRAM)
+
+        # send registration request
+        status = 'on'
+        message = 'reg: ' + name + ' ' + str(client_udp_port) + ' ' + str(client_tcp_port) + ' ' + status
+        print("reg req: " + message)
+        clientSocket.sendto(message.encode(),(server_ip, server_port))
+
+        # receive registration confirmation
+        serverMessage, serverAddress = clientSocket.recvfrom(2048)
+        serverMessage = serverMessage.decode()
+        print("serverMessage: " + serverMessage)
+        if (serverMessage != "registered"):
+            print('Error: client is already registered')
+            sys.exit()
+        
+        print('[Welcome, You are registered.]')
+        print('>>> ', end='', flush=True)
+
+        # receive updated table
+        updated_table_string, serverAddress = clientSocket.recvfrom(2048)
+
+        # once the table is received, client sends ack to server
+        # send ACK
+        ack = "ACK"
+        clientSocket.sendto(ack.encode(),(server_ip, server_port))
+
+        # update table
+        updated_table_string = updated_table_string.decode()
+        print("updated string: " + updated_table_string)
+        updated_table = stringToTable(updated_table_string)
+        print("updated_table: " + str(updated_table))
+        print('[Client table updated.]')
+
+        setup = False
+        while True:
+            command = input('>>> ')
+
+            # setdir functionality
+            if ("setdir" in command):
+                inputs = command.split()
+                if (len(inputs) != 2):
+                    print('use: setdir <dir>')
+                    continue
+        
+                dir = inputs[1]
+
+                # search for directory
+                path = os.getcwd() + '/' + dir
+                print('path: ' + path)
+                if (not os.path.isdir(path)):
+                    print('[setdir failed: ' + dir + ' does not exist.]')
+                    continue
+                
+                print('[Successfully set ' + dir + ' as the directory for searching offered files.]')
+                setup = True
+
+            # TODO: offer functionality
+            elif ("offer" in command):
+                if (not setup):
+                    print('Error: must set a directory first')
+                    continue
+                inputs = command.split()
+                if (len(inputs) < 2):
+                    print('use: offer <filename1> ...')
+                    continue
+                files = inputs[1:]
+
+                # send server UDP message with updated files
+                message = 'offer ' + name + ' '
+                file_string = ''
+                for file in files:
+                    file_string = file_string + ' ' + file
+                message = message + file_string
+                message = message.strip()
+                clientSocket.sendto(message.encode(),(server_ip, server_port))
+
+                # TODO: wait for ACK from server
+                serverMessage, serverAddress = clientSocket.recvfrom(2048)
+                serverMessage = serverMessage.decode()
+                if (serverMessage == "ACK"):
+                    print('[Offer Message received by Server.]')
+                else:
+                    # TODO: change
+                    print('[No ACK from Server, please try again later.]')
+                # timeout at 500ms
+                # retry 2x
             else:
-                # TODO: change
-                print('[No ACK from Server, please try again later.]')
-            # timeout at 500ms
-            # retry 2x
-        else:
-            print("Error: unsupported command")
-            continue
+                print("Error: unsupported command")
+                continue
 
 
-else:
-    print('use: FileApp -s <port> or \
-          use: FileApp -c <name> <server-ip> <server-port> <client-udp-port> <client-tcp-port>')
-    sys.exit()
+    else:
+        print('use: FileApp -s <port> or \
+            use: FileApp -c <name> <server-ip> <server-port> <client-udp-port> <client-tcp-port>')
+        sys.exit()
