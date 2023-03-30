@@ -328,11 +328,14 @@ if __name__ == "__main__":
 
             # list functionality
             elif (command == "list"):
-                print(str(client_table))
                 if (len(client_table) == 0 or len(client_table[0]) == 0):
                     print('[No files available for download at the moment.]')
                 else:
+                    sorted_table = sorted(client_table, key=lambda x:x[0])
+                    print("sorted table: " + str(sorted_table))
                     print("{:12s} {:10s} {:15s} {:10s}".format("FILENAME", "OWNER", "IP ADDRESS", "TCP PORT"))
+                    for file in sorted_table:
+                        print(("{:12s} {:10s} {:15s} {:10s}".format(file[0], file[1], file[2], file[3])))
 
             else:
                 print("Error: unsupported command")
