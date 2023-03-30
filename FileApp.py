@@ -169,8 +169,9 @@ if __name__ == "__main__":
                 message = "update: " + table_string
 
                 for client in server_table:
-                    curr_clientAddress = (client[2], int(client[4]))
-                    serverSocket.sendto(message.encode(), curr_clientAddress)
+                    if (client[1] == 'on'):
+                        curr_clientAddress = (client[2], int(client[4]))
+                        serverSocket.sendto(message.encode(), curr_clientAddress)
 
                 # check for ACK
                 retry = 0
@@ -207,8 +208,9 @@ if __name__ == "__main__":
                 message = "update: " + table_string
 
                 for client in server_table:
-                    curr_clientAddress = (client[2], int(client[4]))
-                    serverSocket.sendto(message.encode(), curr_clientAddress)
+                    if (client[1] == 'on'):
+                        curr_clientAddress = (client[2], int(client[4]))
+                        serverSocket.sendto(message.encode(), curr_clientAddress)
                 
     elif (mode == "-c"):
         ## Client Mode ##
