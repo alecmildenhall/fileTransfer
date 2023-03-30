@@ -9,6 +9,7 @@ import time
 
 ## Helper Functions ##
 
+# TODO: change for broadcast table
 def stringToTable(string):
     table = []
     string_tables = string.split("/")
@@ -35,6 +36,7 @@ def stringToTable(string):
     return table
 
 
+# TODO: change for broadcast table
 def tableToString(table):
     columns = len(table)
     rows = len(table[0])
@@ -73,7 +75,7 @@ def updateFiles(name, files, table):
                     client[5].append(file)
             break
 
-# b_table: [Filename, Owner, Client IP address, Port]
+# b_table: [Filename, Owner, Client IP address, Client TCP Port]
 def tableToBroadcastTable(table):
     b_table = []
     for client in table:
@@ -85,12 +87,25 @@ def tableToBroadcastTable(table):
             b_table.append(curr_list)
     return b_table
 
+def listenToServer(lock, clientSocket, server_ip, server_port):
+    while True:
+        message, serverAddress = clientSocket.recvfrom(2048)
+        message = message.decode()
+
+        if ():
+            # update table
+            pass
+
+
+## Global Variables ##
+server_table = []
+client_table = []
 
 ## Start Main Code ##
 
-## Determine Mode ##
 if __name__ == "__main__":
 
+    ## Determine Mode ##
     try:
         mode = sys.argv[1]
     except:
@@ -109,7 +124,7 @@ if __name__ == "__main__":
         serverSocket = socket(AF_INET, SOCK_DGRAM)
         serverSocket.bind(('', port))
 
-        table = []
+        server_table = []
         # names, online-status, IPaddresses, TCP and UDP port numbers, and filenames
 
         # receives request
@@ -136,8 +151,8 @@ if __name__ == "__main__":
                 
                 # check if name already exists
                 name_exists = 0
-                print("table: " + str(table))
-                for client in table:
+                print("server_table: " + str(server_table))
+                for client in server_table:
                     if client[0] == client_name:
                         print(client_name + ' is already registered')
                         name_exists = 1
@@ -149,15 +164,15 @@ if __name__ == "__main__":
                     continue
 
                 # add client info to table
-                table.append([client_name, client_status, clientIP, client_tcp, client_udp, []])
-                print("updated table: " + str(table))
+                server_table.append([client_name, client_status, clientIP, client_tcp, client_udp, []])
+                print("updated table: " + str(server_table))
 
                 # send client registered message
                 message = "registered"
                 serverSocket.sendto(message.encode(), clientAddress)
 
                 # send client updated table
-                table_string = tableToString(table)
+                table_string = tableToString(server_table)
                 print("server table: " + table_string)
                 serverSocket.sendto(table_string.encode(), clientAddress)
 
@@ -173,7 +188,7 @@ if __name__ == "__main__":
                 # send table again (try this twice)
 
                 # TODO: broadcast to clients?
-                broadcast_table = tableToBroadcastTable(table)
+                broadcast_table = tableToBroadcastTable(server_table)
 
             # receive updated files
             elif ('offer' in message):
@@ -186,15 +201,15 @@ if __name__ == "__main__":
                 files = items[2:]
                 print("name: " + str(name))
                 print("files: " + str(files))
-                print("table: " + str(table))
-                # TODO: match name & add files
-                updateFiles(name, files, table)
+                print("table: " + str(server_table))
+
+                updateFiles(name, files, server_table)
                 print('updated files')
-                print('new table: ' + str(table))
+                print('new table: ' + str(server_table))
 
                 # TODO: broadcast to all active clients the most updated list of file offerings
                 # - needs threads to accomplish this
-                broadcast_table = tableToBroadcastTable(table)
+                broadcast_table = tableToBroadcastTable(server_table)
                 print('broadcast table: ' + str(broadcast_table))
                 
     elif (mode == "-c"):
@@ -224,10 +239,10 @@ if __name__ == "__main__":
             print('given port(s) out of range')
             sys.exit()
 
-        print('>>> ', end='', flush=True)
-
         # initiate client communication to server
         clientSocket = socket(AF_INET, SOCK_DGRAM)
+
+        print('>>> ', end='', flush=True)
 
         # send registration request
         status = 'on'
@@ -246,6 +261,15 @@ if __name__ == "__main__":
         print('[Welcome, You are registered.]')
         print('>>> ', end='', flush=True)
 
+        # lock creation
+        lock = threading.Lock()
+
+        # TODO: thread for listening to the server
+        x = threading.Thread(target=listenToServer, args=(lock, clientSocket, server_ip, server_port), daemon=True)
+
+        # TODO: thread for listening to other clients
+
+
         # receive updated table
         updated_table_string, serverAddress = clientSocket.recvfrom(2048)
 
@@ -257,8 +281,8 @@ if __name__ == "__main__":
         # update table
         updated_table_string = updated_table_string.decode()
         print("updated string: " + updated_table_string)
-        updated_table = stringToTable(updated_table_string)
-        print("updated_table: " + str(updated_table))
+        client_table = stringToTable(updated_table_string)
+        print("client_table: " + str(client_table))
         print('[Client table updated.]')
 
         setup = False
@@ -284,7 +308,6 @@ if __name__ == "__main__":
                 print('[Successfully set ' + dir + ' as the directory for searching offered files.]')
                 setup = True
 
-            # TODO: offer functionality
             elif ("offer" in command):
                 if (not setup):
                     print('Error: must set a directory first')
