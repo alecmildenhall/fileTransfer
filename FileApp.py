@@ -19,7 +19,7 @@ def stringToTable(string):
         for item in items:
             curr_table.append(item)
         table.append(curr_table)
-    print("table from string: " + str(table))
+    #print("table from string: " + str(table))
     return table
 
 
@@ -34,7 +34,7 @@ def tableToString(table):
         output_string = output_string + "/"
     output_string = output_string.strip("/")
 
-    print("output_string: " + output_string)
+    #print("output_string: " + output_string)
     return output_string
 
 # table: [[client_name, client_status, clientIP, client_tcp, client_udp, [file1, file2, etc]], ...]
@@ -66,7 +66,7 @@ def listenToServer(lock, forServerSocket, server_ip, server_port):
         if ("update: " in message):
             # receive updated table
             message = message[8:]
-            print("cleaned message: " + str(message))
+            #print("cleaned message: " + str(message))
 
             # once the table is received, client sends ack to server
             # send ACK
@@ -75,19 +75,26 @@ def listenToServer(lock, forServerSocket, server_ip, server_port):
 
             # update client table
             with lock:
+                global client_table
                 client_table = stringToTable(message)
 
-            print("client_table: " + str(client_table))
-            print('[Client table updated.]')
+            #print("client_table: " + str(client_table))
+            with lock:
+                print('[Client table updated.]')
+                print('>>> ', end='', flush=True)
 
         # TODO: change
         # timeout at 500ms
         # retry 2x
         elif (message == "ACK"):
-            print('[Offer Message received by Server.]')
+            with lock:
+                print('[Offer Message received by Server.]')
+                print('>>> ', end='', flush=True)
 
         else:
-            print('[No ACK from Server, please try again later.]')
+            with lock:
+                print('[No ACK from Server, please try again later.]')
+                print('>>> ', end='', flush=True)
 
 
 ## Global Variables ##
@@ -122,12 +129,12 @@ if __name__ == "__main__":
             message, clientAddress = serverSocket.recvfrom(2048)
             clientIP = clientAddress[0]
             message = message.decode()
-            print("received message: " + message)
+            #print("received message: " + message)
 
             # registration request detected
             if ("reg: " in message):
                 message = message[5:]
-                print("cleaned message: " + message)
+                #print("cleaned message: " + message)
 
                 try:
                     client_info = message.split()
@@ -141,10 +148,10 @@ if __name__ == "__main__":
                 
                 # check if name already exists
                 name_exists = 0
-                print("server_table: " + str(server_table))
+                #print("server_table: " + str(server_table))
                 for client in server_table:
                     if client[0] == client_name:
-                        print(client_name + ' is already registered')
+                        #print('Error: ' + client_name + ' is already registered')
                         name_exists = 1
                         break
                 
@@ -155,7 +162,7 @@ if __name__ == "__main__":
 
                 # add client info to table
                 server_table.append([client_name, client_status, clientIP, client_tcp, client_udp, []])
-                print("updated server table: " + str(server_table))
+                #print("updated server table: " + str(server_table))
 
                 # send client registered message
                 message = "registered"
@@ -163,9 +170,9 @@ if __name__ == "__main__":
 
                 # send clients updated table
                 broadcast_table = tableToBroadcastTable(server_table)
-                print("broadcast table: " + str(broadcast_table))
+                #print("broadcast table: " + str(broadcast_table))
                 table_string = tableToString(broadcast_table)
-                print("server table: " + table_string)
+                #print("server table: " + table_string)
                 message = "update: " + table_string
 
                 for client in server_table:
@@ -193,13 +200,13 @@ if __name__ == "__main__":
                 items = message.split()
                 name = items[1]
                 files = items[2:]
-                print("name: " + str(name))
-                print("files: " + str(files))
-                print("table: " + str(server_table))
+                #print("name: " + str(name))
+                #print("files: " + str(files))
+                #print("table: " + str(server_table))
 
                 updateFiles(name, files, server_table)
-                print('updated files')
-                print('new table: ' + str(server_table))
+                #print('updated files')
+                #print('new table: ' + str(server_table))
 
                 # TODO: broadcast to all active clients the most updated list of file offerings
                 # - needs threads to accomplish this
@@ -232,14 +239,13 @@ if __name__ == "__main__":
                 print('invalid IP address')
                 sys.exit()
         
-        
         if ((int(server_port) < 1024 or int(server_port) > 65535) or 
             (int(client_udp_port) < 1024 or int(client_udp_port) > 65535) or
             (int(client_tcp_port) < 1024 or int(client_tcp_port) > 65535)):
             print('given port(s) out of range')
             sys.exit()
 
-        # initiate client communication to server (UDP)
+        # create client socket for server (UDP)
         forServerSocket = socket(AF_INET, SOCK_DGRAM)
         forServerSocket.bind(('', client_udp_port))
 
@@ -247,23 +253,23 @@ if __name__ == "__main__":
         forClientsSocket = socket(AF_INET,SOCK_STREAM)
         forClientsSocket.bind(('', client_tcp_port))
 
-        print('>>> ', end='', flush=True)
+        #print('>>> ', end='', flush=True)
 
         # send registration request
         status = 'on'
         message = 'reg: ' + name + ' ' + str(client_udp_port) + ' ' + str(client_tcp_port) + ' ' + status
-        print("reg req: " + message)
+        #print("reg req: " + message)
         forServerSocket.sendto(message.encode(),(server_ip, server_port))
 
         # receive registration confirmation
         serverMessage, serverAddress = forServerSocket.recvfrom(2048)
         serverMessage = serverMessage.decode()
-        print("serverMessage: " + serverMessage)
+        #print("serverMessage: " + serverMessage)
         if (serverMessage != "registered"):
             print('Error: client is already registered')
             sys.exit()
         
-        print('[Welcome, You are registered.]')
+        print('>>> [Welcome, You are registered.]')
 
         # lock creation
         lock = threading.Lock()
@@ -271,26 +277,12 @@ if __name__ == "__main__":
         # TODO: thread for listening to the server
         x = threading.Thread(target=listenToServer, args=(lock, forServerSocket, server_ip, server_port), daemon=True)
         x.start()
-        print("after thread")
+        #print('>>> ', end='', flush=True)
+        #print("after thread")
 
         # TODO: thread for listening to other clients
 
-
-        # receive updated table
-        #updated_table_string, serverAddress = forServerSocket.recvfrom(2048)
-
-        # once the table is received, client sends ack to server
-        # send ACK
-        #ack = "ACK"
-        #forServerSocket.sendto(ack.encode(),(server_ip, server_port))
-
-        # update table
-        #updated_table_string = updated_table_string.decode()
-        #print("updated string: " + updated_table_string)
-        #client_table = stringToTable(updated_table_string)
-        #print("client_table: " + str(client_table))
-        #print('[Client table updated.]')
-
+        ## UI ##
         setup = False
         while True:
             command = input('>>> ')
@@ -306,7 +298,7 @@ if __name__ == "__main__":
 
                 # search for directory
                 path = os.getcwd() + '/' + dir
-                print('path: ' + path)
+                #print('path: ' + path)
                 if (not os.path.isdir(path)):
                     print('[setdir failed: ' + dir + ' does not exist.]')
                     continue
@@ -314,6 +306,7 @@ if __name__ == "__main__":
                 print('[Successfully set ' + dir + ' as the directory for searching offered files.]')
                 setup = True
 
+            # offer functionality
             elif ("offer" in command):
                 if (not setup):
                     print('Error: must set a directory first')
@@ -333,16 +326,14 @@ if __name__ == "__main__":
                 message = message.strip()
                 forServerSocket.sendto(message.encode(),(server_ip, server_port))
 
-                # TODO: wait for ACK from server
-                #serverMessage, serverAddress = forServerSocket.recvfrom(2048)
-                #serverMessage = serverMessage.decode()
-                #if (serverMessage == "ACK"):
-                #    print('[Offer Message received by Server.]')
-                #else:
-                    # TODO: change
-                    #print('[No ACK from Server, please try again later.]')
-                # timeout at 500ms
-                # retry 2x
+            # list functionality
+            elif (command == "list"):
+                print(str(client_table))
+                if (len(client_table) == 0 or len(client_table[0]) == 0):
+                    print('[No files available for download at the moment.]')
+                else:
+                    print("{:12s} {:10s} {:15s} {:10s}".format("FILENAME", "OWNER", "IP ADDRESS", "TCP PORT"))
+
             else:
                 print("Error: unsupported command")
                 continue
