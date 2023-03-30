@@ -1,6 +1,7 @@
 #!/usr/bin/env python3.10
 
 from socket import *
+from threading import Event
 import sys
 import os
 import logging
@@ -47,15 +48,23 @@ def updateFiles(name, files, table):
             break
 
 # b_table: [Filename, Owner, Client IP address, Client TCP Port]
+# TODO: do not add files from inactive clients
 def tableToBroadcastTable(table):
+    print("input table: " + str(table))
     b_table = []
     for client in table:
+        status = client[1]
+        if (status == 'off'):
+            print('off client: ' + client[0])
+            continue
+
         owner = client[0]
         client_ip = client[2]
         port = client[3]
         for file in client[5]:
             curr_list = [file, owner, client_ip, port]
             b_table.append(curr_list)
+    print("table to broadcast: " + str(b_table))
     return b_table
 
 def listenToServer(lock, forServerSocket, server_ip, server_port):
@@ -86,25 +95,37 @@ def listenToServer(lock, forServerSocket, server_ip, server_port):
         # TODO: change
         # timeout at 500ms
         # retry 2x
-        elif (message == "ACK"):
-            with lock:
-                print('[Offer Message received by Server.]')
-                print('>>> ', end='', flush=True)
+        # differentiate acks?
+        elif (message == "offer ACK"):
+            print('[Offer Message received by Server.]')
+            print('>>> ', end='', flush=True)
+
+        # TODO: wait for an ack from the server within 500 msecs
+                # retry 3x
+                # if fail, display message & terminate program
+                # - happens in other thread
+                # - differentiate from others
+        elif (message == "dereg ACK"):
+            print('[You are Offline. Bye.]')
 
         else:
-            with lock:
-                print('[No ACK from Server, please try again later.]')
-                print('>>> ', end='', flush=True)
+            print('[No ACK from Server, please try again later.]')
+            print('>>> ', end='', flush=True)
 
-def listenToClient(lock, forClientsSocket):
+
+def listenToClient(lock, client_inactive, forClientsSocket):
     while True:
+        if (client_inactive):
+            print('client inactive')
+            return
+
         # accept client
         connectionSocket, addr = forClientsSocket.accept() ## RETURNS CONNECTION SOCKET
         print('< Accepting connection request from ' + str(addr[0]) + '>')
 
         # receive file request
         message = connectionSocket.recv(2048)
-        message = message.decode()
+        message = message.decode()            
         items = message.split()
         filename = items[0]
         clientname = items[1]
@@ -142,8 +163,7 @@ def listenToClient(lock, forClientsSocket):
 server_table = []
 client_table = []
 path = ""
-#dir = ""
-
+client_inactive = False
 ## Start Main Code ##
 
 if __name__ == "__main__":
@@ -223,7 +243,7 @@ if __name__ == "__main__":
                         curr_clientAddress = (client[2], int(client[4]))
                         serverSocket.sendto(message.encode(), curr_clientAddress)
 
-                # check for ACK
+                # check for ACK (from client for registration)
                 retry = 0
                 message, clientAddress = serverSocket.recvfrom(2048)
                 message = message.decode()
@@ -237,7 +257,7 @@ if __name__ == "__main__":
             # receive updated files
             elif ('offer' in message):
                 # send ACK to client
-                ack = "ACK"
+                ack = "offer ACK"
                 serverSocket.sendto(ack.encode(), clientAddress)
 
                 items = message.split()
@@ -251,8 +271,7 @@ if __name__ == "__main__":
                 #print('updated files')
                 #print('new table: ' + str(server_table))
 
-                # TODO: broadcast to all active clients the most updated list of file offerings
-                # - needs threads to accomplish this
+                # broadcast to all active clients the most updated list of file offerings
                 broadcast_table = tableToBroadcastTable(server_table)
                 table_string = tableToString(broadcast_table)
                 message = "update: " + table_string
@@ -261,6 +280,37 @@ if __name__ == "__main__":
                     if (client[1] == 'on'):
                         curr_clientAddress = (client[2], int(client[4]))
                         serverSocket.sendto(message.encode(), curr_clientAddress)
+            
+            elif ('dereg ' in message):
+                items = message.split()
+                deactivated_client = items[1]
+                print(deactivated_client)
+
+                # change client status to off
+                # TODO: sm wrong here
+                print("server table: " + str(server_table))
+                for client in server_table:
+                    print("client: " + str(client))
+                    if (client[0] == deactivated_client):
+                        client[1] = 'off'
+                print("server table after: " + str(server_table))
+                
+                # broadcast change to clients
+                # TODO: remove off
+                broadcast_table = tableToBroadcastTable(server_table)
+                table_string = tableToString(broadcast_table)
+                message = "update: " + table_string
+                print("message to send: " + message)
+
+                for client in server_table:
+                    if (client[1] == 'on'):
+                        curr_clientAddress = (client[2], int(client[4]))
+                        serverSocket.sendto(message.encode(), curr_clientAddress)
+
+                # send ACK to registered client
+                ack = "dereg ACK"
+                serverSocket.sendto(ack.encode(), clientAddress)
+
                 
     elif (mode == "-c"):
         ## Client Mode ##
@@ -324,8 +374,8 @@ if __name__ == "__main__":
         #print('>>> ', end='', flush=True)
         #print("after thread")
 
-        # TODO: thread for listening to other clients
-        y = threading.Thread(target=listenToClient, args=(lock, forClientsSocket), daemon=True)
+        # thread for listening to other clients
+        y = threading.Thread(target=listenToClient, args=(lock, client_inactive, forClientsSocket), daemon=True)
         y.start()
 
         ## UI ##
@@ -450,6 +500,20 @@ if __name__ == "__main__":
                 # closed connection
                 clientSocket.close()
                 print('< Connection with ' + name + ' closed. >')
+            
+            elif ('dereg' in command):
+                items = command.split()
+                if (len(items) != 2):
+                    print('use: dereg <nick-name>')
+                    continue
+
+                # stop listening to other clients
+                client_inactive = True
+                #forClientsSocket.close()
+
+                # send deregristration request
+                message = command
+                forServerSocket.sendto(message.encode(),(server_ip, server_port))
 
             else:
                 print("Error: unsupported command")
