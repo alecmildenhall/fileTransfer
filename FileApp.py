@@ -9,60 +9,31 @@ import time
 
 ## Helper Functions ##
 
-# TODO: change for broadcast table
+# string: filename owner ip port / ...
 def stringToTable(string):
     table = []
     string_tables = string.split("/")
     for string_table in string_tables:
-        items = string_table.split()
         curr_table = []
-        i = 0
+        items = string_table.split()    
         for item in items:
             curr_table.append(item)
-            # files list section
-            if (i == 5):
-                files = []
-                string_files = items[5].split("*")
-                for string_file in string_files:
-                    files.append(string_file)
-                if (curr_table[5] == 'none'):
-                    curr_table[5] = []
-                else:
-                    curr_table[5].append(files)
-            i = i + 1
-
         table.append(curr_table)
-    
+    print("table from string: " + str(table))
     return table
 
 
-# TODO: change for broadcast table
+# table: [[filename, owner, client ip address, port], ...]
 def tableToString(table):
-    columns = len(table)
-    rows = len(table[0])
     output_string = ""
 
-    for i in range(columns):
-        row_string = ""
-        for j in range(rows):
-            if (j < 5):
-                row_string = str(table[i][j]) + " "
-            # list of files section
-            else:
-                row_string = ""
-                files_string = ""
-                flag = 0
-                for k in range(len(table[i][j])):
-                    files_string = str(table[i][j][k]) + "*"
-                    flag = 1
-                if (not flag):
-                    files_string = "none"
-                files_string = files_string.strip("*")
-                row_string = row_string + files_string
-            output_string = output_string + row_string
+    for file in table:
+        for item in file:
+            output_string = output_string + str(item) + " "
+        output_string = output_string.strip(" ")
         output_string = output_string + "/"
-    
-    output_string = output_string.strip(" /")
+    output_string = output_string.strip("/")
+
     print("output_string: " + output_string)
     return output_string
 
@@ -87,14 +58,36 @@ def tableToBroadcastTable(table):
             b_table.append(curr_list)
     return b_table
 
-def listenToServer(lock, clientSocket, server_ip, server_port):
+def listenToServer(lock, forServerSocket, server_ip, server_port):
     while True:
-        message, serverAddress = clientSocket.recvfrom(2048)
+        message, serverAddress = forServerSocket.recvfrom(2048)
         message = message.decode()
 
-        if ():
-            # update table
-            pass
+        if ("update: " in message):
+            # receive updated table
+            message = message[8:]
+            print("cleaned message: " + str(message))
+
+            # once the table is received, client sends ack to server
+            # send ACK
+            ack = "ACK"
+            forServerSocket.sendto(ack.encode(),(server_ip, server_port))
+
+            # update client table
+            with lock:
+                client_table = stringToTable(message)
+
+            print("client_table: " + str(client_table))
+            print('[Client table updated.]')
+
+        # TODO: change
+        # timeout at 500ms
+        # retry 2x
+        elif (message == "ACK"):
+            print('[Offer Message received by Server.]')
+
+        else:
+            print('[No ACK from Server, please try again later.]')
 
 
 ## Global Variables ##
@@ -123,9 +116,6 @@ if __name__ == "__main__":
 
         serverSocket = socket(AF_INET, SOCK_DGRAM)
         serverSocket.bind(('', port))
-
-        server_table = []
-        # names, online-status, IPaddresses, TCP and UDP port numbers, and filenames
 
         # receives request
         while True:
@@ -165,16 +155,22 @@ if __name__ == "__main__":
 
                 # add client info to table
                 server_table.append([client_name, client_status, clientIP, client_tcp, client_udp, []])
-                print("updated table: " + str(server_table))
+                print("updated server table: " + str(server_table))
 
                 # send client registered message
                 message = "registered"
                 serverSocket.sendto(message.encode(), clientAddress)
 
-                # send client updated table
-                table_string = tableToString(server_table)
+                # send clients updated table
+                broadcast_table = tableToBroadcastTable(server_table)
+                print("broadcast table: " + str(broadcast_table))
+                table_string = tableToString(broadcast_table)
                 print("server table: " + table_string)
-                serverSocket.sendto(table_string.encode(), clientAddress)
+                message = "update: " + table_string
+
+                for client in server_table:
+                    curr_clientAddress = (client[2], int(client[4]))
+                    serverSocket.sendto(message.encode(), curr_clientAddress)
 
                 # check for ACK
                 retry = 0
@@ -186,9 +182,6 @@ if __name__ == "__main__":
 
                 # TODO: if don't receive ACK after 500 ms
                 # send table again (try this twice)
-
-                # TODO: broadcast to clients?
-                broadcast_table = tableToBroadcastTable(server_table)
 
             # receive updated files
             elif ('offer' in message):
@@ -210,10 +203,15 @@ if __name__ == "__main__":
                 # TODO: broadcast to all active clients the most updated list of file offerings
                 # - needs threads to accomplish this
                 broadcast_table = tableToBroadcastTable(server_table)
-                print('broadcast table: ' + str(broadcast_table))
+                table_string = tableToString(broadcast_table)
+                message = "update: " + table_string
+
+                for client in server_table:
+                    curr_clientAddress = (client[2], int(client[4]))
+                    serverSocket.sendto(message.encode(), curr_clientAddress)
                 
     elif (mode == "-c"):
-        # client mode
+        ## Client Mode ##
 
         # get command line arguments
         try:
@@ -239,8 +237,13 @@ if __name__ == "__main__":
             print('given port(s) out of range')
             sys.exit()
 
-        # initiate client communication to server
-        clientSocket = socket(AF_INET, SOCK_DGRAM)
+        # initiate client communication to server (UDP)
+        forServerSocket = socket(AF_INET, SOCK_DGRAM)
+        forServerSocket.bind(('', client_udp_port))
+
+        # create socket for other clients (TCP)
+        forClientsSocket = socket(AF_INET,SOCK_STREAM)
+        forClientsSocket.bind(('', client_tcp_port))
 
         print('>>> ', end='', flush=True)
 
@@ -248,10 +251,10 @@ if __name__ == "__main__":
         status = 'on'
         message = 'reg: ' + name + ' ' + str(client_udp_port) + ' ' + str(client_tcp_port) + ' ' + status
         print("reg req: " + message)
-        clientSocket.sendto(message.encode(),(server_ip, server_port))
+        forServerSocket.sendto(message.encode(),(server_ip, server_port))
 
         # receive registration confirmation
-        serverMessage, serverAddress = clientSocket.recvfrom(2048)
+        serverMessage, serverAddress = forServerSocket.recvfrom(2048)
         serverMessage = serverMessage.decode()
         print("serverMessage: " + serverMessage)
         if (serverMessage != "registered"):
@@ -259,31 +262,32 @@ if __name__ == "__main__":
             sys.exit()
         
         print('[Welcome, You are registered.]')
-        print('>>> ', end='', flush=True)
 
         # lock creation
         lock = threading.Lock()
 
         # TODO: thread for listening to the server
-        x = threading.Thread(target=listenToServer, args=(lock, clientSocket, server_ip, server_port), daemon=True)
+        x = threading.Thread(target=listenToServer, args=(lock, forServerSocket, server_ip, server_port), daemon=True)
+        x.start()
+        print("after thread")
 
         # TODO: thread for listening to other clients
 
 
         # receive updated table
-        updated_table_string, serverAddress = clientSocket.recvfrom(2048)
+        #updated_table_string, serverAddress = forServerSocket.recvfrom(2048)
 
         # once the table is received, client sends ack to server
         # send ACK
-        ack = "ACK"
-        clientSocket.sendto(ack.encode(),(server_ip, server_port))
+        #ack = "ACK"
+        #forServerSocket.sendto(ack.encode(),(server_ip, server_port))
 
         # update table
-        updated_table_string = updated_table_string.decode()
-        print("updated string: " + updated_table_string)
-        client_table = stringToTable(updated_table_string)
-        print("client_table: " + str(client_table))
-        print('[Client table updated.]')
+        #updated_table_string = updated_table_string.decode()
+        #print("updated string: " + updated_table_string)
+        #client_table = stringToTable(updated_table_string)
+        #print("client_table: " + str(client_table))
+        #print('[Client table updated.]')
 
         setup = False
         while True:
@@ -325,16 +329,16 @@ if __name__ == "__main__":
                     file_string = file_string + ' ' + file
                 message = message + file_string
                 message = message.strip()
-                clientSocket.sendto(message.encode(),(server_ip, server_port))
+                forServerSocket.sendto(message.encode(),(server_ip, server_port))
 
                 # TODO: wait for ACK from server
-                serverMessage, serverAddress = clientSocket.recvfrom(2048)
-                serverMessage = serverMessage.decode()
-                if (serverMessage == "ACK"):
-                    print('[Offer Message received by Server.]')
-                else:
+                #serverMessage, serverAddress = forServerSocket.recvfrom(2048)
+                #serverMessage = serverMessage.decode()
+                #if (serverMessage == "ACK"):
+                #    print('[Offer Message received by Server.]')
+                #else:
                     # TODO: change
-                    print('[No ACK from Server, please try again later.]')
+                    #print('[No ACK from Server, please try again later.]')
                 # timeout at 500ms
                 # retry 2x
             else:
