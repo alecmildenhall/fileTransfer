@@ -96,6 +96,39 @@ def listenToServer(lock, forServerSocket, server_ip, server_port):
                 print('[No ACK from Server, please try again later.]')
                 print('>>> ', end='', flush=True)
 
+def listenToClient(lock, forClientsSocket):
+    while True:
+        # accept client
+        connectionSocket, addr = forClientsSocket.accept() ## RETURNS CONNECTION SOCKET
+        print('< Accepting connection request from ' + str(addr[0]) + '>')
+        print("addr: " + str(addr))
+
+        # receive file request
+        message = connectionSocket.recv(2048)
+        message = message.decode()
+        items = message.split()
+        filename = items[0]
+        clientname = items[1]
+
+        # transfer file
+        with open(filename, "rb") as f:
+            i = 0
+            while True:
+                bytes_read = f.read(4096)
+                if not bytes_read:
+                    break
+                forClientsSocket.sendall(bytes_read)
+                if (i == 0):
+                    print('< Transferring ' + filename + ' >')
+                i = i + 1
+
+        # finish transferring file
+        print('< ' + filename + ' transferred successfully! >')
+
+        # close connection
+        connectionSocket.close()
+        print('< Connection with ' + clientname + ' closed. >')
+
 
 ## Global Variables ##
 server_table = []
@@ -252,6 +285,7 @@ if __name__ == "__main__":
         # create socket for other clients (TCP)
         forClientsSocket = socket(AF_INET,SOCK_STREAM)
         forClientsSocket.bind(('', client_tcp_port))
+        forClientsSocket.listen(3)
 
         #print('>>> ', end='', flush=True)
 
@@ -274,19 +308,22 @@ if __name__ == "__main__":
         # lock creation
         lock = threading.Lock()
 
-        # TODO: thread for listening to the server
+        # thread for listening to the server
         x = threading.Thread(target=listenToServer, args=(lock, forServerSocket, server_ip, server_port), daemon=True)
         x.start()
         #print('>>> ', end='', flush=True)
         #print("after thread")
 
         # TODO: thread for listening to other clients
+        y = threading.Thread(target=listenToClient, args=(lock, forClientsSocket), daemon=True)
+        y.start()
 
         ## UI ##
         setup = False
         while True:
             command = input('>>> ')
 
+            path = ""
             # setdir functionality
             if ("setdir" in command):
                 inputs = command.split()
@@ -336,6 +373,62 @@ if __name__ == "__main__":
                     print("{:12s} {:10s} {:15s} {:10s}".format("FILENAME", "OWNER", "IP ADDRESS", "TCP PORT"))
                     for file in sorted_table:
                         print(("{:12s} {:10s} {:15s} {:10s}".format(file[0], file[1], file[2], file[3])))
+            
+            elif ("request" in command):
+                items = command.split()
+                if (len(items) != 3):
+                    print('use: request <filename> <client>')
+                    continue
+
+                filename = items[1]
+                client = items[2]
+                
+                # error checking
+                if (client == name):
+                    print('Error: Invalid Request')
+                    continue
+
+                flag = 1
+                for file in client_table:
+                    print(str(file))
+                    if (file):
+                        if (file[0] == filename and file[1] == client):
+                            destination_IP = file[2]
+                            destination_port = file[3]
+                            flag = 0
+                            break
+                
+                if (flag):
+                    print('Error: Invalid Request')
+                    continue
+
+                # connect to client
+                clientSocket = socket(AF_INET, SOCK_STREAM)
+                clientSocket.connect((destination_IP, int(destination_port)))
+                print('< Connection with ' + client + ' established. >')
+
+                # request file
+                message = filename + ' ' + name
+                clientSocket.send(message.encode())
+
+                # download file
+                with open(filename, "wb") as f:
+                    i = 0
+                    while True:
+                        bytes_read = clientSocket.recv(4096)
+                        if not bytes_read:
+                            break
+                        f.write(bytes_read)
+                        if (i == 0):
+                            print('< Downloading ' + filename + '... >')
+                        i = i + 1
+
+                # finish download
+                print('< ' + filename + ' downloaded successfully! >')
+
+                # closed connection
+                clientSocket.close()
+                print('< Connection with ' + name + ' closed. >')
 
             else:
                 print("Error: unsupported command")
