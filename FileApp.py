@@ -101,7 +101,6 @@ def listenToClient(lock, forClientsSocket):
         # accept client
         connectionSocket, addr = forClientsSocket.accept() ## RETURNS CONNECTION SOCKET
         print('< Accepting connection request from ' + str(addr[0]) + '>')
-        print("addr: " + str(addr))
 
         # receive file request
         message = connectionSocket.recv(2048)
@@ -109,15 +108,23 @@ def listenToClient(lock, forClientsSocket):
         items = message.split()
         filename = items[0]
         clientname = items[1]
+        file_path = path + '/' + filename
+        print("path: " + str(path))
+        print("file_path: " + file_path)
+        print(os.path)
+        print()
+        if (not os.path.isfile(file_path)):
+            print('Error: file does not exist in client')
+            continue
 
         # transfer file
-        with open(filename, "rb") as f:
+        with open(file_path, "rb") as f:
             i = 0
             while True:
                 bytes_read = f.read(4096)
                 if not bytes_read:
                     break
-                forClientsSocket.sendall(bytes_read)
+                connectionSocket.sendall(bytes_read) # ERROR HERE
                 if (i == 0):
                     print('< Transferring ' + filename + ' >')
                 i = i + 1
@@ -128,11 +135,14 @@ def listenToClient(lock, forClientsSocket):
         # close connection
         connectionSocket.close()
         print('< Connection with ' + clientname + ' closed. >')
+        print('>>> ', end='', flush=True)
 
 
 ## Global Variables ##
 server_table = []
 client_table = []
+path = ""
+#dir = ""
 
 ## Start Main Code ##
 
@@ -162,7 +172,7 @@ if __name__ == "__main__":
             message, clientAddress = serverSocket.recvfrom(2048)
             clientIP = clientAddress[0]
             message = message.decode()
-            #print("received message: " + message)
+            print("received message: " + message)
 
             # registration request detected
             if ("reg: " in message):
@@ -323,7 +333,7 @@ if __name__ == "__main__":
         while True:
             command = input('>>> ')
 
-            path = ""
+            #path = ""
             # setdir functionality
             if ("setdir" in command):
                 inputs = command.split()
@@ -353,9 +363,20 @@ if __name__ == "__main__":
                     print('use: offer <filename1> ...')
                     continue
                 files = inputs[1:]
+                
+                flag = 0
+                for file in files:
+                    file_path = path + '/' + file
+                    if (not os.path.isfile(file_path)):
+                        flag = 1
+                        break
+                
+                if (flag):
+                    print('Error: file does not exist')
+                    continue
 
                 # send server UDP message with updated files
-                message = 'offer ' + name + ' '
+                message = 'offer ' + name
                 file_string = ''
                 for file in files:
                     file_string = file_string + ' ' + file
