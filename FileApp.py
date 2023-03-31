@@ -20,7 +20,6 @@ def stringToTable(string):
         for item in items:
             curr_table.append(item)
         table.append(curr_table)
-    #print("table from string: " + str(table))
     return table
 
 
@@ -35,7 +34,6 @@ def tableToString(table):
         output_string = output_string + "/"
     output_string = output_string.strip("/")
 
-    #print("output_string: " + output_string)
     return output_string
 
 # table: [[client_name, client_status, clientIP, client_tcp, client_udp, [file1, file2, etc]], ...]
@@ -48,9 +46,7 @@ def updateFiles(name, files, table):
             break
 
 # b_table: [Filename, Owner, Client IP address, Client TCP Port]
-# TODO: do not add files from inactive clients
 def tableToBroadcastTable(table):
-    print("input table: " + str(table))
     b_table = []
     for client in table:
         status = client[1]
@@ -64,7 +60,6 @@ def tableToBroadcastTable(table):
         for file in client[5]:
             curr_list = [file, owner, client_ip, port]
             b_table.append(curr_list)
-    print("table to broadcast: " + str(b_table))
     return b_table
 
 def listenToServer(lock, forServerSocket, server_ip, server_port):
@@ -75,7 +70,6 @@ def listenToServer(lock, forServerSocket, server_ip, server_port):
         if ("update: " in message):
             # receive updated table
             message = message[8:]
-            #print("cleaned message: " + str(message))
 
             # once the table is received, client sends ack to server
             # send ACK
@@ -87,7 +81,6 @@ def listenToServer(lock, forServerSocket, server_ip, server_port):
                 global client_table
                 client_table = stringToTable(message)
 
-            #print("client_table: " + str(client_table))
             with lock:
                 print('[Client table updated.]')
                 print('>>> ', end='', flush=True)
@@ -130,10 +123,7 @@ def listenToClient(lock, client_inactive, forClientsSocket):
         filename = items[0]
         clientname = items[1]
         file_path = path + '/' + filename
-        print("path: " + str(path))
-        print("file_path: " + file_path)
-        print(os.path)
-        print()
+        
         if (not os.path.isfile(file_path)):
             print('Error: file does not exist in client')
             continue
@@ -197,7 +187,6 @@ if __name__ == "__main__":
             # registration request detected
             if ("reg: " in message):
                 message = message[5:]
-                #print("cleaned message: " + message)
 
                 try:
                     client_info = message.split()
@@ -211,10 +200,8 @@ if __name__ == "__main__":
                 
                 # check if name already exists
                 name_exists = 0
-                #print("server_table: " + str(server_table))
                 for client in server_table:
                     if client[0] == client_name:
-                        #print('Error: ' + client_name + ' is already registered')
                         name_exists = 1
                         break
                 
@@ -225,7 +212,6 @@ if __name__ == "__main__":
 
                 # add client info to table
                 server_table.append([client_name, client_status, clientIP, client_tcp, client_udp, []])
-                #print("updated server table: " + str(server_table))
 
                 # send client registered message
                 message = "registered"
@@ -233,9 +219,7 @@ if __name__ == "__main__":
 
                 # send clients updated table
                 broadcast_table = tableToBroadcastTable(server_table)
-                #print("broadcast table: " + str(broadcast_table))
                 table_string = tableToString(broadcast_table)
-                #print("server table: " + table_string)
                 message = "update: " + table_string
 
                 for client in server_table:
@@ -263,13 +247,8 @@ if __name__ == "__main__":
                 items = message.split()
                 name = items[1]
                 files = items[2:]
-                #print("name: " + str(name))
-                #print("files: " + str(files))
-                #print("table: " + str(server_table))
 
                 updateFiles(name, files, server_table)
-                #print('updated files')
-                #print('new table: ' + str(server_table))
 
                 # broadcast to all active clients the most updated list of file offerings
                 broadcast_table = tableToBroadcastTable(server_table)
@@ -284,23 +263,16 @@ if __name__ == "__main__":
             elif ('dereg ' in message):
                 items = message.split()
                 deactivated_client = items[1]
-                print(deactivated_client)
 
                 # change client status to off
-                # TODO: sm wrong here
-                print("server table: " + str(server_table))
                 for client in server_table:
-                    print("client: " + str(client))
                     if (client[0] == deactivated_client):
                         client[1] = 'off'
-                print("server table after: " + str(server_table))
                 
                 # broadcast change to clients
-                # TODO: remove off
                 broadcast_table = tableToBroadcastTable(server_table)
                 table_string = tableToString(broadcast_table)
                 message = "update: " + table_string
-                print("message to send: " + message)
 
                 for client in server_table:
                     if (client[1] == 'on'):
@@ -347,18 +319,14 @@ if __name__ == "__main__":
         forClientsSocket.bind(('', client_tcp_port))
         forClientsSocket.listen(3)
 
-        #print('>>> ', end='', flush=True)
-
         # send registration request
         status = 'on'
         message = 'reg: ' + name + ' ' + str(client_udp_port) + ' ' + str(client_tcp_port) + ' ' + status
-        #print("reg req: " + message)
         forServerSocket.sendto(message.encode(),(server_ip, server_port))
 
         # receive registration confirmation
         serverMessage, serverAddress = forServerSocket.recvfrom(2048)
         serverMessage = serverMessage.decode()
-        #print("serverMessage: " + serverMessage)
         if (serverMessage != "registered"):
             print('Error: client is already registered')
             sys.exit()
@@ -371,8 +339,6 @@ if __name__ == "__main__":
         # thread for listening to the server
         x = threading.Thread(target=listenToServer, args=(lock, forServerSocket, server_ip, server_port), daemon=True)
         x.start()
-        #print('>>> ', end='', flush=True)
-        #print("after thread")
 
         # thread for listening to other clients
         y = threading.Thread(target=listenToClient, args=(lock, client_inactive, forClientsSocket), daemon=True)
@@ -383,7 +349,6 @@ if __name__ == "__main__":
         while True:
             command = input('>>> ')
 
-            #path = ""
             # setdir functionality
             if ("setdir" in command):
                 inputs = command.split()
@@ -395,7 +360,6 @@ if __name__ == "__main__":
 
                 # search for directory
                 path = os.getcwd() + '/' + dir
-                #print('path: ' + path)
                 if (not os.path.isdir(path)):
                     print('[setdir failed: ' + dir + ' does not exist.]')
                     continue
@@ -440,7 +404,6 @@ if __name__ == "__main__":
                     print('[No files available for download at the moment.]')
                 else:
                     sorted_table = sorted(client_table, key=lambda x:x[0])
-                    print("sorted table: " + str(sorted_table))
                     print("{:12s} {:10s} {:15s} {:10s}".format("FILENAME", "OWNER", "IP ADDRESS", "TCP PORT"))
                     for file in sorted_table:
                         print(("{:12s} {:10s} {:15s} {:10s}".format(file[0], file[1], file[2], file[3])))
@@ -461,7 +424,6 @@ if __name__ == "__main__":
 
                 flag = 1
                 for file in client_table:
-                    print(str(file))
                     if (file):
                         if (file[0] == filename and file[1] == client):
                             destination_IP = file[2]
@@ -518,7 +480,6 @@ if __name__ == "__main__":
             else:
                 print("Error: unsupported command")
                 continue
-
 
     else:
         print('use: FileApp -s <port> or \
