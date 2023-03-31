@@ -51,7 +51,6 @@ def tableToBroadcastTable(table):
     for client in table:
         status = client[1]
         if (status == 'off'):
-            print('off client: ' + client[0])
             continue
 
         owner = client[0]
@@ -182,7 +181,6 @@ if __name__ == "__main__":
             message, clientAddress = serverSocket.recvfrom(2048)
             clientIP = clientAddress[0]
             message = message.decode()
-            print("received message: " + message)
 
             # registration request detected
             if ("reg: " in message):
@@ -232,7 +230,8 @@ if __name__ == "__main__":
                 message, clientAddress = serverSocket.recvfrom(2048)
                 message = message.decode()
                 if (message == "ACK"):
-                    print('ACK received')
+                    pass
+                    # ACK received
 
                 # ^^
                 # TODO: if don't receive ACK after 500 ms
