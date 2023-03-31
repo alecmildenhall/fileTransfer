@@ -234,9 +234,11 @@ if __name__ == "__main__":
                 if (message == "ACK"):
                     print('ACK received')
 
-
+                # ^^
                 # TODO: if don't receive ACK after 500 ms
+                # THIS IS THE MANDATORY ONE
                 # send table again (try this twice)
+                # event object to communicate between threads to manage the Acks and timing 
 
             # receive updated files
             elif ('offer' in message):
