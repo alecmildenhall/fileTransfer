@@ -84,19 +84,10 @@ def listenToServer(lock, forServerSocket, server_ip, server_port):
                 print('[Client table updated.]')
                 print('>>> ', end='', flush=True)
 
-        # TODO: change
-        # timeout at 500ms
-        # retry 2x
-        # differentiate acks?
         elif (message == "offer ACK"):
             print('[Offer Message received by Server.]')
             print('>>> ', end='', flush=True)
-
-        # TODO: wait for an ack from the server within 500 msecs
-                # retry 3x
-                # if fail, display message & terminate program
-                # - happens in other thread
-                # - differentiate from others
+            
         elif (message == "dereg ACK"):
             print('[You are Offline. Bye.]')
 
@@ -231,13 +222,7 @@ if __name__ == "__main__":
                 message = message.decode()
                 if (message == "ACK"):
                     pass
-                    # ACK received
-
-                # ^^
-                # TODO: if don't receive ACK after 500 ms
-                # THIS IS THE MANDATORY ONE
-                # send table again (try this twice)
-                # event object to communicate between threads to manage the Acks and timing 
+                    # ACK received 
 
             # receive updated files
             elif ('offer' in message):
